@@ -13,6 +13,9 @@ int main(int argc, char *argv[]){
 int output;
 int connection_socket;
 int data_socket;
+char buffer[BUFFER_LENGTH];
+int client_data;
+int result;
 
 struct sockaddr_un unix_name;
 
@@ -39,7 +42,7 @@ printf("Master Socket File Descriptor created sucessfully");
         exit(EXIT_FAILURE);
    }
 
-printf("bind system call sucessful");
+printf("bind() system call sucessful");
 
    output = listen(connection_socket, 20);
 
@@ -49,7 +52,7 @@ printf("bind system call sucessful");
         exit(EXIT_FAILURE);
    }
 
-printf("listen system call sucessful");
+printf("listen() system call sucessful");
 
    while(1)
    {
@@ -61,8 +64,45 @@ printf("listen system call sucessful");
                    exit(EXIT_FAILURE);
            }
 
-           printf("Connection Initiation Request received from client\n");
+           printf("Connection Initiation Request received from Client\n");
+           printf("Connection sucessfully established with the Client\n");
+
+           while(1){
+                   memset(buffer, 0, BUFFER_LENGTH);
+                   printf("Waiting for Client to send Data\n");
+                   output = read(data_socket, buffer, BUFFER_LENGTH);
+
+           if(output == -1){
+                   perror("read");
+                   exit(EXIT_FAILURE);
+           }
+                   memcpy(&client_data, buffer, sizeof(int));
+
+                   if(client_data == 0){
+                           printf("Client wants to terminate the connection\n");
+                           break;
+                   }
+
+                   result += client_data;
+           }
+
+           printf("Server sending final Result to Client\n");
+           memset(buffer, 0, BUFFER_LENGTH);
+           sprintf(buffer, "Result = %d", result);
+           
+           output = write(data_socket, buffer , BUFFER_LENGTH);
+
+           if(write == -1){
+                   perror("write");
+                   exit(EXIT_FAILURE);
+           }
+           
+           printf("Server terminating the connection\n");
+           close(data_socket);
    }
 
-
+close(connection_socket);
+printf("Connection closed ...\n");
+unlink(SOCKET_NAME);
+exit(EXIT_SUCCESS);
 }
