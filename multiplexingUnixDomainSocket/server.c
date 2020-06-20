@@ -27,7 +27,6 @@ static void initializeMultiplexFdSet()
         }
 }
 
-
 /*Add a File Descriptor to multiplex_fd_set*/
 static void addToMultiplexFdSet(int communication_fd)
 {
@@ -76,7 +75,7 @@ static int getMaxFd()
 
 /*Clearing the previous fd_data set values and cloning multiplex_fd_set into fd_set Data Strcuture provided by Linux OS Kernel*/
 
-static void refreshFdSet(fd_set *fdDataSetPtr)
+static void refreshFdSet(fd_set* fdDataSetPtr)
 {
         FD_ZERO(fdDataSetPtr);      //Setting all values in fd_set to 0
         int i;
@@ -90,46 +89,70 @@ static void refreshFdSet(fd_set *fdDataSetPtr)
         }
 }
 
-
-
-
 int main(int argc, char *argv[])
 {
 
         int connection_socket;
         int data_socket;
         int output;
-        int buffer[BUFFER_MAX_SIZE];
+        int result;
+        int data;
+        int i; 
+        int communication_socket_fd;
+        char buffer[BUFFER_MAX_SIZE];
+        fd_set readfs; 
+        struct sockaddr_un unix_name;
 
         initializeMultiplexFdSet();
         unlink(SOCKET_NAME);
-        connection_socket = socket();
+
+        /*Creating a MAster socket file descriptor and dselecting the communication type either Data straem or Data gram*/
+        connection_socket = socket(AF_UNIX, SOCK_STREAM, 0);
 
         if(connection_socket == -1)
         {
                 perror(socket);
                 exit(EXIT_FAILURE);
         }
-
         printf("Master File descriptor sucessfully created");
 
+        unix_name.sun_family = AF_UNIX;
+        strncpy(unix_name.sun_path, SOCKET_NAME, sizeof(unix_name.sun_path));
 
-        bind
+        /*Bind system call tells the underlying Linux Kernel that if any cliuent sends Message for following SOCKET_NAME send it to me (server process)*/
+        output = bind(connection_socket, (const struct sockaddr_un*) &unix_name, sizeof(struct sockaddr_un));
 
-                listen
+        if(output == -1)
+        {
+                perror(bind);
+                exit(EXIT_FAILURE);
+        }
+        printf("bind() system call is sucessful");
 
-                addToMultiplexFdSet(connection_socket);
+        output = listen(connection_socket, 20);
+
+        if(output == -1)
+        {
+                perror(listen);
+                exit(EXIT_FAILURE);
+        }
+        printf("listen() system call is sucessful");
+        
+        /*Adding Master File descriptor to fd_data set*/
+        addToMultiplexFdSet(connection_socket);
 
         while(1)
         {
                 refreshFdSet(&readfds);
 
                 printf("Waiting on select() system call");
-
+                /*select() system call is a blocking call and hence server is waiting for Connection Initiation Request or Service Request Message fom client so that it can move forward*/
+                
                 select(getMaxFd() + 1, &readfds, NULL, NULL, NULL);
-
+                /*Here we will check it is a CIR or a SRM*/
                 if(FD_ISSET(connection_socket, &readfds))
                 {
+                        /*CIR is sent from Client and hence trying to establish connection between server process and client process*/
                         data_socket = accept(connection_socket, NULL, NULL);
 
                         if(data_socket == -1)
@@ -143,8 +166,10 @@ int main(int argc, char *argv[])
                 }
                 else
                 {
-                        int i, communication_socket_fd = -1;
-                        for(i = 0; i < MAX_CLIENT; i++)
+                        /*SRM is sent from Client and hence messages communication takes place between already established connection
+                         Here we will find which cklient has sent data message and this is done by checking in the fd_set which file descriptor is Activated*/
+                        i = 0, communication_socket_fd = -1;
+                        for(; i < MAX_CLIENT; i++)
                         {
                                 if(FD_ISSET(multiplex_fd_set[i], &readfds))
                                 {
@@ -181,9 +206,17 @@ int main(int argc, char *argv[])
                                         removeFromMultiplexFdSet(communication_socket_fd);
                                         continue;
                                 }
-                                result[i] =+ data;
+                                result[i] += data;
 
                         }
                 }
         }
+        /*Closing the MAster socket*/
+        close(connection_socket);
+        removeFromMultiplexFdSet(connection_socket);
+        printf("Closing connection...");
+
+/*Socket should release resources before getting terminated, here we are unlinking the socket*/
+        unlink(SOCKET_NAME);
+        exit(EXIT_SUCESS);
 }
