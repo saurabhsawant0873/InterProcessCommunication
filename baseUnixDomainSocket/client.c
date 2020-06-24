@@ -12,7 +12,7 @@ int main(int argc, char *argv[]){
         
         int data_socket;
         int output;
-        int server_data;
+        //int server_data;
         int result;
         char buffer[BUFFER_LENGTH];
 
@@ -20,7 +20,8 @@ int main(int argc, char *argv[]){
 
         data_socket = socket(AF_UNIX, SOCK_STREAM, 0);
 
-        if(data_socket == -1){
+        if(data_socket == -1)
+        {
                 perror("socket");
                 exit(EXIT_FAILURE);
         }
@@ -31,30 +32,28 @@ int main(int argc, char *argv[]){
         strncpy(unix_name.sun_path, SOCKET_NAME, sizeof(unix_name.sun_path) - 1);
         printf("Trying to establish connection with the Server");
         
-        output = connect(data_socket, (const struct sockaddr_un*) unix_name, sizeof(struct sockaddr_un));
+        output = connect(data_socket, (const struct sockaddr_un*) &unix_name, sizeof(struct sockaddr_un));
 
-        if(output == -1){
+        if(output == -1)
+        {
                fprintf(stderr, "The server is down\n");
                exit(EXIT_FAILURE);
         }
 
         printf("Sending data to Server\n");
-        
         do{
                 printf("Enter a Number : ");
                 scanf("%d", &i);
-                memset(buffer, 0, BUFFER_LENGTH);
-
-                write(data_socket, &i, BUFFER_LENGTH);
+                write(data_socket, &i, sizeof(int));
 
                 if(output == -1){
-                        perror("write");
-                        break;
+                    perror("write");
+                    break;
                 }
-                
+ 
                 printf("Number of Bytes sent = %d and data sent = %d", output, i); 
                
-               }while(i);
+        }while(i);
 
 memset(buffer, 0, BUFFER_LENGTH);
 
